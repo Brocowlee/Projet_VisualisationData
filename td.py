@@ -2,88 +2,65 @@ import pandas as pd
 import plotly.express as px
 import json
 from dash import Dash, dcc, html, Input, Output
+from plotly.subplots import make_subplots
 import os
 
-files_name = ['C:/Users/arthu/OneDrive/Documents/Travail/FI4/Visualisation/projMedia/preprocess-topaz-data732//' + file_name for file_name in os.listdir('C:/Users/arthu/OneDrive/Documents/Travail/FI4/Visualisation/projMedia/preprocess-topaz-data732//') if '.json' in file_name]
+files_name = ['D:\Documents\WORK\IDU4\VISUALISATION//' + file_name for file_name in os.listdir('D:\Documents\WORK\IDU4\VISUALISATION') if '.json' in file_name]
 
-#months = {'1' : 0, '1' : 0, '2' : 0, '3' : 0, '4' : 0,'5' : 0, '6' : 0,'7' : 0,'8' : 0,'9' : 0,'10' : 0,'11' : 0,'12' : 0}
-#for file_name in files_name:
-#    print(file_name)
-#    f = open(file_name, 'r', encoding='utf-8')
-#    data = json.loads(f.read())
-#    for year in data['data-all'].values():
-#        for month in year.items():
-#            for day in month[1].values():
-#                months[month[0]] += len(day)
+
+def KW100(link1,link2):
+    files_name=[link1,link2]
+    allKw=[]
+    for file_name in files_name:
+        keywords_count = []
+        print(file_name)
+        f = open(file_name, 'r', encoding='utf-8')
+        data = json.loads(f.read())
+        for fr in data['metadata-all'].values():
+            for year in fr["year"].items():
+                for keyword in year[1]["kws"].items():
+                    keywords_count.append( [str(keyword[0]), int(keyword[1]) ])
+                
+        df = pd.DataFrame.from_dict(keywords_count).rename(columns = {0:"kw",1:"amount"})
+        df = df.groupby(["kw"]).mean()
+        df= df.nlargest(200, 'amount')
+        #df = df.reset_index()
+        allKw.append(df)
+
     
-#months = {}
-#for file_name in files_name:
-#    print(file_name)
-#    f = open(file_name, 'r', encoding='utf-8')
-#    data = json.loads(f.read())
-#    for year in data['data-all'].items():
-#        for month in year[1].items():
-#            print(f"{year[0]}-{month[0]}")
-#            for day in month[1].values():
-#                try:
-#                    months[f"{year[0]}-{month[0]}"] += len(day) 
-#                except:
-#                    months[f"{year[0]}-{month[0]}"] = len(day)
-#                
-#def sort_key(x):
-#    year, month = x[0].split("-")
-#    return int(year) + int(month)
-#
-#months = dict(sorted(months.items(), key = sort_key))
-#                
-#fig = px.bar(pd.DataFrame(list(zip(months.keys(), months.values())), columns=['Month', "Amount"]), x='Month', y='Amount')
-#fig.show()
-#print(pd.DataFrame(list(zip(months.keys(), months.values())), columns=['Month', "Amount"]))
-#fig.write_html("exememple.html")               
-#    
+    return allKw[0],allKw[1]
 
 
-allKw=[]
-for file_name in files_name:
-    keywords_count = []
-    print(file_name)
-    f = open(file_name, 'r', encoding='utf-8')
-    data = json.loads(f.read())
-    for fr in data['metadata-all'].values():
-        for year in fr["year"].items():
-            for keyword in year[1]["kws"].items():
-                keywords_count.append( [str(keyword[0]), int(keyword[1]) ])
-            
-    df = pd.DataFrame.from_dict(keywords_count).rename(columns = {0:"kw",1:"amount"})
-    df = df.groupby(["kw"]).mean()
-    df= df.nlargest(100, 'amount')
-    df = df.reset_index()
-    allKw.append(df)
-    
+tab1=KW100("D:/Documents/WORK/IDU4/VISUALISATION/topaz-data732--mali--www.fdesouche.com--20190101--20211231.json","D:/Documents/WORK/IDU4/VISUALISATION/topaz-data732--mali--www.egaliteetreconciliation.fr--20190101--20211231.json")[0]
+tab2=KW100("D:/Documents/WORK/IDU4/VISUALISATION/topaz-data732--mali--www.fdesouche.com--20190101--20211231.json","D:/Documents/WORK/IDU4/VISUALISATION/topaz-data732--mali--www.egaliteetreconciliation.fr--20190101--20211231.json")[1]
 
-# app = Dash(__name__)
+# print(tab1)
+# print(tab2)
 
-# app.layout = html.Div([
-#     html.H4('10 Most recurrent keyword'),
-#     dcc.Dropdown(
-#         id="dropdown",
-#         options= [2018, 2019, 2020, 2021],
-#         value=[2018],
-#         clearable=False,
-#     ),
-#     dcc.Graph(id="graph"),
-# ])
+def combine(kw1,kw2):
+    res=pd.concat([kw1,kw2])
+    res=pd.DataFrame(index=res.index.drop_duplicates(),columns=["amount1","amount2"]).fillna(0)
+    print(res)
+    for e in res.index:
+        try:
+            res.at[e,"amount1"]=kw1.at[e,"amount"]
+        except:
+            pass
+        try:
+            res.at[e,"amount2"]=kw2.at[e,"amount"]
+        except:
+            pass
+    return res
+
+print(combine(tab1,tab2))
 
 
-# @app.callback(
-#     Output("graph", "figure"), 
-#     Input("dropdown", "value"))
-# def update_bar_chart(year):
-#     df1 = df # replace with your own data source
-#     mask = df1["year"] == year
-#     fig = px.bar(df1[mask], x="kw", y="amount", 
-#                  color="kw", barmode="group")
-#     return fig
+
+def interetCommun(kw1,kw2):
+    df=combine(tab1,tab2)
+    df["exclu"]=abs(df["amount1"]-df["amount2"])
+    fig=px.scatter(df, x="amount1", y="amount2",color="exclu",hover_data=[df.index])
+    fig.show()
 
 
-# app.run_server(debug=True)
+interetCommun(tab1,tab2)
