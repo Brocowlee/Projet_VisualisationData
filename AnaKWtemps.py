@@ -56,12 +56,9 @@ files_name = ['C:/Users/arthu/OneDrive/Documents/Travail/FI4/Visualisation/projM
             
 #     df = pd.DataFrame.from_dict(keywords_count).rename(columns = {0:"kw",1:"amount"})
 #     df = df.groupby(["kw"]).mean()
-#     df= df.nlargest(100, 'amount')
-#     df = df.reset_index()
-#     allKw.append(df)
-# print(allKw)
+#     df= df.nlargest(100,
     
-def evolKW(kw,journal):
+def evolKW(kwRef,journal):
     df=pd.DataFrame(columns=["kw","amount","date"])
     f = open(journal, 'r', encoding='utf-8')
     data = json.loads(f.read())
@@ -71,10 +68,26 @@ def evolKW(kw,journal):
             for month in year[1].items():
                 for day in month[1].items():
                     for kw in day[1]["kws"].items():
-                        df.loc[counter]=[str(kw[0]),str(kw[1]),str(day[0])+"/"+str(month[0])+"/"+str(year[0])]
-                        counter+=1
-    print(df)
-evolKW(None, "C:/Users/arthu/OneDrive/Documents/Travail/FI4/Visualisation/projMedia/preprocess-topaz-data732/topaz-data732--mali--www.egaliteetreconciliation.fr--20190101--20211231.json")
+                        if str(kw[0])==kwRef:
+                            if len(str(month[0]))==1:
+                                df.loc[counter]=[str(kw[0]),str(kw[1]),str(year[0])+"/0"+str(month[0])+"/"+str(day[0])]
+                            if len(str(day[0]))==1:
+                                df.loc[counter]=[str(kw[0]),str(kw[1]),str(year[0])+"/"+str(month[0])+"/0"+str(day[0])]
+                            if len(str(day[0]))==1 and len(str(month[0]))==1:
+                                df.loc[counter]=[str(kw[0]),str(kw[1]),str(year[0])+"/0"+str(month[0])+"/0"+str(day[0])]
+                            df.loc[counter]=[str(kw[0]),int(kw[1]),str(year[0])+"/"+str(month[0])+"/"+str(day[0])]
+
+                            counter+=1
+
+    df=df.set_index("date")
+    df=df.sort_index()
+    print(df.head(20))
+    fig = px.line(df, x=df.index, y="amount", title='presence of the world '+kwRef)
+    fig.show()
+
+
+evolKW("attentat", "C:/Users/arthu/OneDrive/Documents/Travail/FI4/Visualisation/projMedia/preprocess-topaz-data732/topaz-data732--mali--www.egaliteetreconciliation.fr--20190101--20211231.json")
+
 
 # app = Dash(__name__)
 
