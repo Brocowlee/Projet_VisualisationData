@@ -327,8 +327,6 @@ external_stylesheets = [
 
 app = Dash(__name__, external_stylesheets=external_stylesheets)
 
-image_filename = 'cluster_200kw.png' # replace with your own image
-encoded_image = base64.b64encode(open(image_filename, 'rb').read())
 
 app.layout = html.Div(
     children=[
@@ -377,6 +375,13 @@ app.layout = html.Div(
 
                 html.P(children = "Avec la Principal Component Analysis 2D, on observe que le groupement par clusters n'est pas identique au groupement des articles par médias." 
                 " Cela signifie qu'on ne peut pas distinguer les sources en analysant les mots-clés et les thèmes qui en ressortent, et donc que chaque journal peut traiter de thèmes communs.", style={'font-style' : 'italic'}),
+
+                #html.Iframe(src="assets/cluster_200kw.svg", style={'width' : "80%", 'height':"800px"}),
+                html.Div(children=[
+                    html.Img(src="assets/cluster_200kw.svg")
+                ], style={'width' : "80%", 'height':"800px", 'overflow' : 'scroll', 'background-color' : 'black'}),
+
+                html.Iframe(src="assets/network/index.html", style={'width' : "80%", 'height':"800px"})
 
             ], className='wrapper'
         )
