@@ -7,6 +7,7 @@ from sklearn.decomposition import PCA
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import dash_dangerously_set_inner_html
+import math
 
 medias = ['french.presstv.ir', 'www.egaliteetreconciliation.fr',
        'www.fdesouche.com', 'fr.sputniknews.africa']
@@ -880,6 +881,88 @@ def generate_plot_correlation(kw, occurences):
 
 occurences = from_csv_occurences("occurences.csv")
 
+def get_top_kw_from_source(source, occurences, n):
+  total_source = np.sum(np.asarray([ occs for occs in occurences[source]]), axis = 0)
+  total_source = pd.DataFrame(list(zip(vocab500, total_source)))
+  total_source.columns = ["keyword", "amount"]
+  total_source["percentage"] = total_source["amount"].apply(lambda x : x/total_source["amount"].sum()*100)
+  total_source = total_source.sort_values("amount", ascending = False).head(n)
+  return total_source
+
+def common_interest(source1, source2, n):
+  df1 = get_top_kw_from_source(source1, occurences, n)
+  df2 = get_top_kw_from_source(source2, occurences, n)
+  all_keywords = pd.concat([df1["keyword"], df2["keyword"]]).drop_duplicates()
+  compared_interest = []
+  for kw in all_keywords:
+    row = [kw]
+    try:
+      if not len(df1.loc[df1["keyword"] == kw]["amount"].index):
+        raise KeyError
+
+      amount = df1.loc[df1["keyword"] == kw]["amount"].iloc[0]
+      percentage = df1.loc[df1["keyword"] == kw]["percentage"].iloc[0]
+      row = [*row, amount, percentage]
+    except KeyError:
+      row = [*row, 0, 0]
+    try:
+      if not len(df2.loc[df2["keyword"] == kw]["amount"].index):
+        raise KeyError
+
+      amount = df2.loc[df2["keyword"] == kw]["amount"].iloc[0] 
+      percentage = df2.loc[df2["keyword"] == kw]["percentage"].iloc[0]
+      row = [*row, amount, percentage]
+    except KeyError:
+      row = [*row, 0, 0]
+
+    compared_interest.append(row)
+  compared_interest = pd.DataFrame(compared_interest)
+  compared_interest.columns = ["keyword", "amount_1", "percentage_1", "amount_2", "percentage_2" ]
+
+
+  def shortest_distance(x1, y1, a, b, c):
+    d = abs((a * x1 + b * y1 + c)) / (math.sqrt(a * a + b * b))
+    d = -d if x1 > y1 else d
+    return d
+
+  compared_interest["distance"] = compared_interest.apply(lambda x: shortest_distance(x["percentage_1"], x["percentage_2"], 1, -1, 0 ), axis = 1)
+  compared_interest = compared_interest.sort_values("distance")
+
+
+  fig=px.scatter(compared_interest, x="keyword", y="distance",color="distance",title ="Facteur d'intêret commun par mot-clé" , labels={
+                     "keyword": "keyword",
+                     "distance": "Facteur d'intérêt commun",
+                 },hover_data=["keyword", "amount_1",  "amount_2", "percentage_1", "percentage_2", "distance"], color_continuous_scale=["red", "grey", "blue"], color_continuous_midpoint = 0)
+  fig.update_yaxes(
+    scaleanchor = "x",
+    scaleratio = 1,
+  )
+  fig.update_layout(coloraxis_colorbar=dict(
+    title="Ligne editoriale",
+    tickvals=[compared_interest["distance"].min(),compared_interest["distance"].max()],
+    ticktext=[source1, source2],
+))
+
+  random_x = np.linspace(0, 4, 5)
+  fig2=px.scatter(compared_interest, x="percentage_1", y="percentage_2",color="distance",hover_data=["keyword", "amount_1",  "amount_2", "percentage_1", "percentage_2", "distance"],
+                 color_continuous_scale=["red", "grey", "blue"], color_continuous_midpoint = 0, labels={
+                     "percentage_1": "percentage source 1",
+                     "percentage_2": "percentage source 2",
+                 }, title="Comparaison de la proportion d'utilisation des mots clés")
+                 
+  fig2.add_trace(go.Scatter(x=random_x, y=random_x,
+                    mode='lines',
+                    name='y=x'))
+
+  fig2.update_layout(coloraxis_colorbar=dict(
+    title="Ligne Editoriale",
+    tickvals=[compared_interest["distance"].min(),compared_interest["distance"].max()],
+    ticktext=[source1, source2],
+))
+
+  return fig, fig2
+
+
 external_stylesheets = [
     {
         "href": "https://fonts.googleapis.com/css2?"
@@ -1007,8 +1090,43 @@ app.layout = html.Div(
 
             ], className='card-big'),
             
+        ], className='wrapper'),
+
+html.Div(children = [
+            html.H2(children="Étude comparative des lignes éditoriales", className ='header-title'),
+            html.P(children="Analyse comparative de l'utilisation des mots-clés", className='header-description'),
+            html.P(children=" Cette analyse permet d'étudier la convergence et divergence de l'utilisation des mots-clés par différentes sources.", className='header-description', style={'font-style' : 'italic'})
+            ], className='header'),
+        html.Div(children=[
 
 
+        html.Div(children =[
+
+            html.Span(children = ["Source 1 :",
+                dcc.Dropdown(medias, "french.presstv.ir", id ="source1")
+            ]),
+
+            html.Span(children =[
+                "Source 2 :",
+                 dcc.Dropdown(medias, "www.egaliteetreconciliation.fr", id ="source2")
+            ]),
+
+            html.Span(children =[
+                "n mots clés les plus fréquents/source",
+                 dcc.Input(id="n-ic", type="number", value=150, style={"margin-left" : '10px'})
+            ]),
+
+
+            html.Button('Plot editorial policy comparison', id='submit-ic', n_clicks=0),
+            dcc.Graph(id = 'common-interest2', style={'width': '80vw', 'height' : '950x', 'margin' : '0 auto'}),
+            dcc.Graph(id = 'common-interest', style={'width': '80vw', 'height' : '950x', 'margin' : '0 auto'}),
+            html.P(children="Ce graphique montre pour chaque sources l'usage commun ou non des n mots clés les plus fréquents pour les deux sources. "
+            " On calcule un facteur d'intérêt commun pour chaque mot-clés à partir du nombre d'occurences pour les deux sources, qui correspond à la distance entre "
+            " le point (nb occurences source 1, nb occurences source2) et la droite y=x. Ainsi, une valeur autour de 0 signifie que le mot clé est employé à proportions égales par les "
+            " deux sources. Une valeur significativement supérieur à 0 signifie qu'il est plus employé par la source 2, et inversement pour une valeur inférieure à 0.")
+            
+
+        ], className='card-big')
 
         ], className='wrapper')
     ]
@@ -1038,6 +1156,17 @@ def update_evol(click, value):
     corr = generate_plot_correlation(value, occurences)
     return generate_plot_evolution(value, "total", occurences), corr[0], "<h2>Top 10</h2>" + corr[1]
 
+@app.callback(
+    Output("common-interest", "figure"),
+    Output("common-interest2", "figure"),
+    Input("submit-ic", "n_clicks"),
+    State("source1", "value"),
+    State("source2", "value"),
+    State("n-ic", "value")
+)
+def update_common_interest(click, source1, source2,n):
+    ci1, ci2 = common_interest(source1, source2, n)
+    return ci1, ci2
 
 if __name__ == "__main__":
     app.run_server(debug=True)

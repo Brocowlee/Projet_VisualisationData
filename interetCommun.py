@@ -4,6 +4,7 @@ import json
 from dash import Dash, dcc, html, Input, Output
 from plotly.subplots import make_subplots
 import os
+import math 
 
 files_name = ['D:\Documents\WORK\IDU4\VISUALISATION//' + file_name for file_name in os.listdir('D:\Documents\WORK\IDU4\VISUALISATION') if '.json' in file_name]
 
